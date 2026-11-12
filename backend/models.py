@@ -1,3 +1,4 @@
+import json
 import pytz
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
@@ -6,6 +7,15 @@ db = SQLAlchemy()
 
 def get_ist_now():
     return datetime.now(pytz.timezone('Asia/Kolkata'))
+
+def _safe_json(val):
+    """Parse a JSON-encoded column value, falling back to the raw value."""
+    if val is None:
+        return None
+    try:
+        return json.loads(val)
+    except (json.JSONDecodeError, TypeError):
+        return val
 
 class Encounter(db.Model):
     __tablename__ = 'encounters'
@@ -70,12 +80,6 @@ class Encounter(db.Model):
     consent_records = db.relationship('ConsentRecord', backref='encounter', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
-        import json
-        def safe_json(val):
-            if val is None: return None
-            try: return json.loads(val)
-            except: return val
-
         return {
             'id': self.id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
@@ -91,15 +95,15 @@ class Encounter(db.Model):
             'clinical': {
                 'chief_complaint': self.chief_complaint,
                 'hpi': self.hpi,
-                'symptoms': safe_json(self.symptoms),
+                'symptoms': _safe_json(self.symptoms),
                 'duration': self.duration,
                 'severity': self.severity,
                 'associated_symptoms': self.associated_symptoms,
                 'medications': self.medications,
                 'allergies': self.allergies,
                 'past_history': self.past_history,
-                'red_flags': safe_json(self.red_flags),
-                'confidence': safe_json(self.confidence_scores),
+                'red_flags': _safe_json(self.red_flags),
+                'confidence': _safe_json(self.confidence_scores),
             },
             'triage_level': self.triage_level,
             'patient_summary': self.patient_summary,
@@ -109,8 +113,8 @@ class Encounter(db.Model):
                 'agni_status': self.ayush_agni,
                 'recommendations': self.ayush_recommendations,
             },
-            'ocr_data': safe_json(self.ocr_data),
-            'fhir_record': safe_json(self.fhir_record),
+            'ocr_data': _safe_json(self.ocr_data),
+            'fhir_record': _safe_json(self.fhir_record),
             'followup': {
                 'question': self.followup_question,
                 'reason': self.followup_reason,
