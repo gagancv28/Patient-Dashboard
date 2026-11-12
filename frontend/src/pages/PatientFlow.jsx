@@ -98,6 +98,9 @@ const PatientForm = ({ onSubmit, lang }) => {
   );
 };
 
+const VOICE_WAVEFORM_HEIGHTS = [35, 65, 85, 50, 90, 60, 75, 40, 80, 55, 70, 45, 85, 60, 35];
+const AI_WAVEFORM_HEIGHTS = [40, 75, 55, 90, 65, 80, 50, 70];
+
 // ─── Step 4: Voice Recording (WOW MOMENT) ─────────────────────────
 const VoiceRecorder = ({ onSubmit, lang, patientName }) => {
   const [recording, setRecording] = useState(false);
@@ -215,9 +218,9 @@ const VoiceRecorder = ({ onSubmit, lang, patientName }) => {
           )}
 
           <div className="waveform-container" style={{ margin: '2rem 0' }}>
-            {Array.from({length: 15}).map((_, i) => (
+            {VOICE_WAVEFORM_HEIGHTS.map((barHeight, i) => (
               <div key={i} className={`waveform-bar ${recording ? 'recording' : ''}`} 
-                style={{ height: recording ? `${Math.random() * 80 + 20}%` : '20%', transitionDuration: '0.2s' }} />
+                style={{ height: recording ? `${barHeight}%` : '20%', transitionDuration: '0.2s' }} />
             ))}
           </div>
 
@@ -320,7 +323,7 @@ const AIProcessingScreen = ({ text, onDone }) => {
         {/* Center: Processing Visualization */}
         <div style={{ width: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(15,23,42,0.9)', borderRight: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
           <div className="waveform-container" style={{ transform: 'rotate(90deg)', width: '200px' }}>
-            {Array.from({length: 8}).map((_, i) => <div key={i} className="waveform-bar ai-active" style={{ height: `${Math.random()*80+20}%` }} />)}
+            {AI_WAVEFORM_HEIGHTS.map((barHeight, i) => <div key={i} className="waveform-bar ai-active" style={{ height: `${barHeight}%` }} />)}
           </div>
           <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--bg-dark)', padding: '0.5rem', borderRadius: '50%', border: '2px solid var(--purple)' }}>
              <span className="spin" style={{ display: 'block', fontSize: '1.5rem' }}>⚙️</span>
