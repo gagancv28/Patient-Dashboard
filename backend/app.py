@@ -37,6 +37,23 @@ def add_security_headers(response):
     response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
     return response
 
+@app.errorhandler(400)
+def bad_request(_err):
+    return jsonify({"error": "Bad request"}), 400
+
+@app.errorhandler(404)
+def not_found(_err):
+    return jsonify({"error": "Not found"}), 404
+
+@app.errorhandler(405)
+def method_not_allowed(_err):
+    return jsonify({"error": "Method not allowed"}), 405
+
+@app.errorhandler(500)
+def internal_error(_err):
+    db.session.rollback()
+    return jsonify({"error": "Internal server error"}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint for deployment platforms."""
