@@ -69,8 +69,8 @@ def get_config():
 @app.route('/api/encounter', methods=['POST'])
 def create_encounter():
     """Create a new encounter from patient flow data."""
-    data = request.json or {}
-    transcript = data.get('transcript', '')
+    data = request.get_json(silent=True) or {}
+    transcript = str(data.get('transcript') or '').strip()
     scenario_id = data.get('scenario_id')
 
     # If loading a demo scenario
@@ -83,18 +83,23 @@ def create_encounter():
     if not transcript:
         return jsonify({"error": "No transcript provided"}), 400
 
+    language = str(data.get('language') or 'en').strip().lower()
+    if language not in ('en', 'hi', 'kn'):
+        language = 'en'
+    patient_name = str(data.get('patient_name') or '').strip() or 'Unknown'
+
     # Process through clinical extraction (demo or real)
     clinical = _extract_clinical(transcript)
     ayush = _extract_ayush(transcript)
     followup = _generate_followup(clinical)
 
     enc = Encounter(
-        patient_name=data.get('patient_name', 'Unknown'),
-        patient_age=data.get('patient_age', ''),
-        patient_gender=data.get('patient_gender', ''),
-        phone_number=data.get('phone_number', ''),
-        email_address=data.get('email_address', ''),
-        language=data.get('language', 'en'),
+        patient_name=patient_name,
+        patient_age=str(data.get('patient_age') or '').strip(),
+        patient_gender=str(data.get('patient_gender') or '').strip(),
+        phone_number=str(data.get('phone_number') or '').strip(),
+        email_address=str(data.get('email_address') or '').strip(),
+        language=language,
         raw_transcript=transcript,
         chief_complaint=clinical.get('chief_complaint', ''),
         hpi=clinical.get('hpi', ''),
