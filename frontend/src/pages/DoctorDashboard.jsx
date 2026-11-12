@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 import { t } from '../i18n';
 import { SocratesHistory, WordsComparison } from '../components/ClinicalHistory';
@@ -39,25 +39,41 @@ export default function DoctorDashboard({ language, initialEncounterId }) {
   const [showAudit, setShowAudit] = useState(false);
   const [history, setHistory] = useState([]);
 
-  const fetchQueue = async () => {
-    try { const d = await api.getQueue(); setQueue(d); setSelected(current => current ? (d.find(enc => enc.id === current.id) || d[0] || null) : (d.find(enc => enc.id === initialEncounterId) || d[0] || null)); }
-    catch(e) { console.error(e); }
-    finally { setLoading(false); }
-  };
+  const fetchQueue = useCallback(async () => {
+    try {
+      const d = await api.getQueue();
+      setQueue(d);
+      setSelected(current => current ? (d.find(enc => enc.id === current.id) || d[0] || null) : (d.find(enc => enc.id === initialEncounterId) || d[0] || null));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [initialEncounterId]);
 
-  useEffect(() => { fetchQueue(); const i = setInterval(fetchQueue, 3000); return () => clearInterval(i); }, []);
+  useEffect(() => {
+    const initial = setTimeout(() => { void fetchQueue(); }, 0);
+    const interval = setInterval(() => { void fetchQueue(); }, 3000);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(interval);
+    };
+  }, [fetchQueue]);
 
   useEffect(() => {
     if (!initialEncounterId) return;
     api.getEncounter(initialEncounterId).then(setSelected).catch(() => {});
   }, [initialEncounterId]);
 
+  const selectedId = selected?.id;
+  const selectedPhone = selected?.patient?.phone;
+
   useEffect(() => {
-    if (selected?.patient?.phone) {
-      api.getPatientHistory(selected.patient.phone).then(setHistory).catch(() => {});
-      api.getAuditTrail(selected.id).then(setAudit).catch(() => {});
+    if (selectedId && selectedPhone) {
+      api.getPatientHistory(selectedPhone).then(setHistory).catch(() => {});
+      api.getAuditTrail(selectedId).then(setAudit).catch(() => {});
     }
-  }, [selected?.id]);
+  }, [selectedId, selectedPhone]);
 
   const handleApprove = async (id) => {
     await api.approveEncounter(id);
