@@ -1,4 +1,4 @@
-const BASE = 'http://localhost:5000/api';
+const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
@@ -30,6 +30,7 @@ export const api = {
 
   // Analytics
   getAnalytics: () => request('/analytics'),
+  getConfig: () => request('/config'),
 
   // Demo
   getScenarios: () => request('/demo/scenarios'),

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 
-export default function DemoControlCenter() {
+export default function DemoControlCenter({ onOpenCase }) {
   const [scenarios, setScenarios] = useState([]);
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
@@ -13,9 +13,9 @@ export default function DemoControlCenter() {
   const loadScenario = async (id) => {
     setStatus(`Loading ${id}...`);
     try {
-      await api.loadScenario(id);
-      setStatus(`Successfully loaded ${id} into Doctor Queue!`);
-      setTimeout(() => setStatus(''), 3000);
+      const result = await api.loadScenario(id);
+      setStatus(`Opening the complete case for ${id}…`);
+      onOpenCase?.(result.encounter?.id);
     } catch (e) {
       setStatus(`Error: ${e.message}`);
     }
@@ -36,16 +36,13 @@ export default function DemoControlCenter() {
 
   return (
     <div className="container" style={{ padding: '2rem', maxWidth: '1000px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
+      <div className="demo-header">
         <div>
-          <h2 className="display-font" style={{ fontSize: '2.5rem', margin: 0, color: 'var(--text)' }}>
-            Demo Control <span className="text-gradient-purple">Center</span>
-          </h2>
-          <p style={{ color: 'var(--text-dim)', marginTop: '0.5rem' }}>Inject test data for the SIH2026 presentation</p>
+          <span className="eyebrow">Presentation workspace</span>
+          <h2 className="display-font" style={{ fontSize: '2.5rem', margin: 0, color: 'var(--text)' }}>Demo scenarios</h2>
+          <p style={{ color: 'var(--text-dim)', marginTop: '0.5rem' }}>Load a complete patient journey into the doctor queue in one tap.</p>
         </div>
-        <div className="badge badge-ai" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
-          DEMO_MODE: ON
-        </div>
+        <div className="demo-mode">● DEMO MODE · DETERMINISTIC</div>
       </div>
 
       {status && (
@@ -58,9 +55,10 @@ export default function DemoControlCenter() {
         <div style={{ flex: 2 }}>
           <h3 className="display-font" style={{ fontSize: '1.5rem', marginBottom: '1.5rem', color: 'var(--text)' }}>Available Test Patients</h3>
           <div className="stack gap-3">
-            {scenarios.map(s => (
-              <div key={s.id} className="glass-panel" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {scenarios.map((s, index) => (
+              <div key={s.id} className="glass-panel scenario-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
+                  <div className="scenario-number">Scenario {String(index + 1).padStart(2, '0')} · {s.language?.toUpperCase()}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
                     <strong className="display-font" style={{ fontSize: '1.25rem' }}>{s.patient_name || s.label}</strong>
                     <span className={`triage-pill triage-${s.triage_level.toLowerCase()}`}>{s.triage_level}</span>
@@ -72,7 +70,7 @@ export default function DemoControlCenter() {
                     {s.red_flags > 0 && <span className="badge badge-danger">Red Flags: {s.red_flags}</span>}
                   </div>
                 </div>
-                <button className="btn btn-purple btn-xl" onClick={() => loadScenario(s.id)}>Inject →</button>
+                <button className="btn btn-blue" onClick={() => loadScenario(s.id)}>Load scenario →</button>
               </div>
             ))}
           </div>
@@ -81,7 +79,7 @@ export default function DemoControlCenter() {
         <div style={{ flex: 1 }}>
           <div className="glass-panel" style={{ padding: '2rem', position: 'sticky', top: '2rem' }}>
             <h3 className="display-font" style={{ fontSize: '1.25rem', marginBottom: '1rem', color: 'var(--text)' }}>System Controls</h3>
-            <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '2rem' }}>Use this to clear the queue before presenting to a new judge.</p>
+            <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '2rem' }}>Reset only when you are ready to start a fresh presentation.</p>
             <button className="btn btn-crimson" style={{ width: '100%', padding: '1rem' }} onClick={resetDB}>
               ⚠ Wipe Database
             </button>

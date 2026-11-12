@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { t } from '../i18n';
+import { getCasePriority, languageLabel, SocratesHistory, WordsComparison } from '../components/ClinicalHistory';
 
 const formatIST = (iso) => {
   try { return new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) + ' IST'; }
@@ -24,7 +25,7 @@ const ConfBar = ({ val }) => {
   );
 };
 
-export default function DoctorDashboard({ language }) {
+export default function DoctorDashboard({ language, initialEncounterId }) {
   const [queue, setQueue] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,12 +39,17 @@ export default function DoctorDashboard({ language }) {
   const [history, setHistory] = useState([]);
 
   const fetchQueue = async () => {
-    try { const d = await api.getQueue(); setQueue(d); if (!selected && d.length) setSelected(d[0]); }
+    try { const d = await api.getQueue(); setQueue(d); setSelected(current => current ? (d.find(enc => enc.id === current.id) || d[0] || null) : (d.find(enc => enc.id === initialEncounterId) || d[0] || null)); }
     catch(e) { console.error(e); }
     finally { setLoading(false); }
   };
 
   useEffect(() => { fetchQueue(); const i = setInterval(fetchQueue, 3000); return () => clearInterval(i); }, []);
+
+  useEffect(() => {
+    if (!initialEncounterId) return;
+    api.getEncounter(initialEncounterId).then(setSelected).catch(() => {});
+  }, [initialEncounterId]);
 
   useEffect(() => {
     if (selected?.patient?.phone) {
@@ -70,11 +76,12 @@ export default function DoctorDashboard({ language }) {
   };
 
   const criticalCount = queue.filter(e => e.triage_level === 'EMERGENCY' || e.triage_level === 'HIGH').length;
+  const casePriority = selected ? getCasePriority(selected) : null;
 
   if (loading) return <div className="center" style={{ minHeight: '60vh' }}><div className="spin" style={{ width: '40px', height: '40px', border: '3px solid var(--border)', borderTop: '3px solid var(--blue)', borderRadius: '50%' }} /></div>;
 
   return (
-    <div style={{ display: 'flex', gap: '1.5rem', height: 'calc(100vh - 100px)', maxWidth: '1600px', margin: '0 auto' }}>
+    <div className="doctor-workspace" style={{ display: 'flex', gap: '1.5rem', height: 'calc(100vh - 100px)', maxWidth: '1600px', margin: '0 auto' }}>
       
       {/* LEFT: Queue List */}
       <div style={{ width: '380px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '1rem', overflow: 'hidden' }}>
@@ -110,7 +117,7 @@ export default function DoctorDashboard({ language }) {
             return (
               <div key={enc.id} className={`glass ${glowCls}`}
                 onClick={() => { setSelected(enc); setShowFhir(false); setShowAudit(false); }}
-                style={{ padding: '1.25rem', cursor: 'pointer', borderLeft: isActive ? '4px solid var(--blue)' : '4px solid transparent', background: isActive ? 'rgba(30,41,59,0.9)' : 'var(--bg-card)' }}>
+                style={{ padding: '1.25rem', cursor: 'pointer', borderLeft: isActive ? '4px solid var(--blue)' : '4px solid transparent', background: isActive ? '#eaf5f8' : 'var(--bg-card)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                   <strong className="display-font" style={{ fontSize: '1.1rem' }}>{enc.patient?.name}</strong>
                   <span className={`triage-pill triage-${triage.toLowerCase()}`}>{triage}</span>
@@ -160,7 +167,7 @@ export default function DoctorDashboard({ language }) {
                     <span className={`triage-pill triage-${(selected.triage_level||'low').toLowerCase()}`} style={{ fontSize: '0.85rem' }}>{selected.triage_level}</span>
                   </div>
                   <p style={{ color: 'var(--text-dim)', fontSize: '1rem' }}>
-                    {selected.patient?.age} yrs · {selected.patient?.gender} · ID: CS-{selected.id} · {formatIST(selected.created_at)}
+                    {selected.patient?.age} yrs · {selected.patient?.gender} · Patient language: {languageLabel(selected.language)} · ID: CS-{selected.id}
                   </p>
                 </div>
                 {selected.doctor_approved && (
@@ -169,14 +176,17 @@ export default function DoctorDashboard({ language }) {
               </div>
 
               {/* AI Narrative Summary */}
-              <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-sm)', borderLeft: '4px solid var(--blue)' }}>
+              <div className="doctor-summary" style={{ marginTop: '2rem', padding: '1.5rem', borderRadius: 'var(--radius-sm)' }}>
                 <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem', alignItems: 'center' }}>
-                  <span className="badge badge-ai">AI Case Synthesis</span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Auto-generated from patient voice</span>
+                  <span className="badge badge-ai">AI-generated summary</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>AI assists documentation only; the doctor remains responsible for clinical decisions.</span>
                 </div>
                 <p style={{ fontStyle: 'italic', lineHeight: 1.7, fontSize: '1.1rem', color: 'var(--text-dim)' }}>"{selected.patient_summary}"</p>
               </div>
             </div>
+
+            <div className={`case-priority ${casePriority.tone}`}><div><span className="eyebrow">Doctor case review priority</span><h3>{casePriority.label}</h3><p>{casePriority.reason}</p></div><span className="badge badge-warning">Not a diagnosis</span></div>
+            <WordsComparison encounter={selected} />
 
             {/* View Toggles */}
             <div className="glass" style={{ padding: '0.5rem', display: 'flex', gap: '0.5rem', borderRadius: 'var(--radius-full)' }}>
@@ -234,6 +244,7 @@ export default function DoctorDashboard({ language }) {
             {!showFhir && !showAudit && viewMode === 'western' && (
               <div className="glass-panel slide-up" style={{ padding: '2rem' }}>
                 <h3 className="display-font" style={{ fontSize: '1.5rem', marginBottom: '1.5rem', color: 'var(--blue)' }}>Structured Assessment (SOCRATES)</h3>
+                <SocratesHistory encounter={selected} />
                 
                 {/* Symptoms Tags */}
                 {selected.clinical?.symptoms?.length > 0 && (
@@ -306,8 +317,8 @@ export default function DoctorDashboard({ language }) {
                 {selected.ocr_data && (
                   <div>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-                      <h4 className="display-font" style={{ color: 'var(--emerald)', fontSize: '1.25rem', margin: 0 }}>OCR Prescription Data</h4>
-                      <span className="badge badge-warning">Verify before use</span>
+                      <h4 className="display-font" style={{ color: 'var(--emerald)', fontSize: '1.25rem', margin: 0 }}>AI/OCR Extracted</h4>
+                      <span className={selected.doctor_approved ? 'badge badge-verified' : 'badge badge-warning'}>{selected.doctor_approved ? 'Doctor verified' : 'Doctor verification required'}</span>
                     </div>
                     <div style={{ background: 'rgba(16,185,129,0.05)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(16,185,129,0.2)' }}>
                       {selected.ocr_data.medications?.map((m, i) => (

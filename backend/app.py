@@ -17,13 +17,35 @@ DEMO_MODE = os.environ.get('DEMO_MODE', 'true').lower() == 'true'
 IST = pytz.timezone('Asia/Kolkata')
 
 app = Flask(__name__)
-CORS(app)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///codescribe.db'
+cors_origins_env = os.environ.get('CORS_ORIGINS', '*').strip()
+cors_origins = '*' if cors_origins_env == '*' else [o.strip() for o in cors_origins_env.split(',') if o.strip()]
+CORS(app, resources={r"/api/*": {"origins": cors_origins}})
+# Keep the existing on-disk database as the default, while allowing an isolated
+# database to be selected for QA and deployment environments.
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///codescribe.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
 with app.app_context():
     db.create_all()
+
+@app.after_request
+def add_security_headers(response):
+    """Attach baseline HTTP security headers to all API responses."""
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'DENY')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    return response
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for deployment platforms."""
+    return jsonify({"status": "ok", "demo_mode": DEMO_MODE})
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    """Expose only the feature mode needed by the client UI."""
+    return jsonify({"demo_mode": DEMO_MODE})
 
 # ─── Encounter CRUD ────────────────────────────────────────────────
 
@@ -163,7 +185,7 @@ def update_encounter(id):
         'associated_symptoms', 'medications', 'allergies', 'past_history',
         'red_flags', 'triage_level', 'patient_summary',
         'ayush_prakriti', 'ayush_vikriti', 'ayush_agni', 'ayush_recommendations',
-        'followup_answer', 'status'
+        'followup_answer', 'ocr_data', 'status'
     ]
 
     for field in editable_fields:
@@ -367,7 +389,7 @@ def _mock_clinical(text):
     }
 
     # 1. Stomach / Vomiting
-    if 'stomach' in t or 'abdomin' in t or 'vomit' in t:
+    if any(term in t for term in ('stomach', 'abdomin', 'vomit', 'पेट', 'उल्टी', 'ಹೊಟ್ಟೆ', 'ವಾಂತಿ')):
         resp['chief_complaint'] = "Abdominal pain and vomiting"
         resp['symptoms'] = ["Abdominal pain", "Vomiting"]
         resp['triage_level'] = "MEDIUM"
@@ -375,7 +397,7 @@ def _mock_clinical(text):
             resp['duration'] = "1 day"
             
     # 2. Fever / Headache
-    elif 'fever' in t or 'headache' in t or 'bukhar' in t:
+    elif any(term in t for term in ('fever', 'headache', 'bukhar', 'बुखार', 'सिरदर्द', 'ಜ್ವರ', 'ತಲೆನೋವು')):
         resp['chief_complaint'] = "Fever and headache"
         resp['symptoms'] = ["Fever", "Headache"]
         resp['triage_level'] = "MEDIUM"
@@ -383,17 +405,17 @@ def _mock_clinical(text):
             resp['duration'] = "2 days"
 
     # 3. Shoulder
-    elif 'shoulder' in t:
+    elif any(term in t for term in ('shoulder', 'कंध', 'ಭುಜ')):
         resp['chief_complaint'] = "Right shoulder pain" if 'right' in t else "Shoulder pain"
         resp['symptoms'] = [resp['chief_complaint']]
 
     # 4. Knee
-    elif 'knee' in t or 'joint' in t:
+    elif any(term in t for term in ('knee', 'joint', 'घुटन', 'जोड़', 'ಮೊಣಕಾಲ', 'ಕೀಲು')):
         resp['chief_complaint'] = "Left knee pain" if 'left' in t else "Knee pain"
         resp['symptoms'] = [resp['chief_complaint']]
 
     # 5. Chest / Emergency
-    elif 'chest' in t or 'heart' in t or 'pressure' in t:
+    elif any(term in t for term in ('chest', 'heart', 'pressure', 'छाती', 'सीने', 'दिल', 'दबाव', 'ಎದೆ', 'ಹೃದಯ', 'ಒತ್ತಡ')):
         resp['chief_complaint'] = "Chest pain"
         resp['symptoms'] = ["Chest pain"]
         resp['triage_level'] = "EMERGENCY"
@@ -421,19 +443,19 @@ def _mock_ayush(text):
         "recommendations": "General dietary modifications and rest."
     }
     
-    if 'chest' in t or 'heart' in t:
+    if any(term in t for term in ('chest', 'heart', 'छाती', 'सीने', 'दिल', 'ಎದೆ', 'ಹೃದಯ')):
         resp['vikriti_dosha'] = "Prana Vata and Vyana Vata imbalance"
         resp['recommendations'] = "Urgent medical referral. Avoid heavy foods."
-    elif 'fever' in t or 'headache' in t:
+    elif any(term in t for term in ('fever', 'headache', 'bukhar', 'बुखार', 'सिरदर्द', 'ಜ್ವರ', 'ತಲೆನೋವು')):
         resp['prakriti'] = "Pitta"
         resp['vikriti_dosha'] = "Pitta aggravation"
         resp['agni_status'] = "Tikshnagni (Hyperactive digestion)"
         resp['recommendations'] = "Cooling herbs, hydration, avoid spicy foods."
-    elif 'stomach' in t or 'vomit' in t:
+    elif any(term in t for term in ('stomach', 'vomit', 'पेट', 'उल्टी', 'ಹೊಟ್ಟೆ', 'ವಾಂತಿ')):
         resp['vikriti_dosha'] = "Saman Vata and Pachaka Pitta imbalance"
         resp['agni_status'] = "Mandagni (Low digestive fire)"
         resp['recommendations'] = "Light easily digestible food (Khichdi). Ginger water."
-    elif 'knee' in t or 'shoulder' in t or 'joint' in t:
+    elif any(term in t for term in ('knee', 'shoulder', 'joint', 'घुटन', 'कंध', 'जोड़', 'ಮೊಣಕಾಲ', 'ಕೀಲು', 'ಭುಜ')):
         resp['vikriti_dosha'] = "Vata aggravation in Sandhigata (joints)"
         resp['recommendations'] = "Warm oil application. Avoid cold foods."
         
@@ -496,6 +518,8 @@ def legacy_update_status(id):
 
 
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     print(f"\n[CodeScribe AI Backend] DEMO_MODE={'ON' if DEMO_MODE else 'OFF'}")
     print(f"   SIH2026 | Team Code Raiders | Problem SIH26047\n")
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', port=port, debug=debug)

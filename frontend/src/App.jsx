@@ -1,168 +1,63 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from './components/Navbar';
 import PatientFlow from './pages/PatientFlow';
 import DoctorDashboard from './pages/DoctorDashboard';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import DemoControlCenter from './pages/DemoControlCenter';
-import { t } from './i18n';
+
+const VIEWS = ['landing', 'patient', 'doctor', 'analytics', 'demo'];
 
 class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, errorInfo) {
-    console.error("App Error Caught by Boundary:", error, errorInfo);
-  }
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
   render() {
-    if (this.state.hasError) {
-      return (
-        <div className="center" style={{ minHeight: '100vh', flexDirection: 'column', gap: '2rem', background: '#0f172a', color: '#fff', textAlign: 'center', padding: '2rem' }}>
-          <div style={{ fontSize: '4rem' }}>🚨</div>
-          <h1 className="display-font" style={{ fontSize: '2.5rem', color: 'var(--crimson)' }}>Portal Crash Detected</h1>
-          <p style={{ color: 'var(--text-dim)', maxWidth: '600px', lineHeight: 1.6 }}>
-            A critical error occurred while rendering this portal. The corrupted state has been isolated to prevent further crashes.
-          </p>
-          <div style={{ background: 'rgba(239,68,68,0.1)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--amber)', fontSize: '0.9rem', maxWidth: '600px', wordWrap: 'break-word' }}>
-            {this.state.error?.message}
-          </div>
-          <button className="btn btn-blue btn-xl" onClick={() => { localStorage.removeItem('cs_view'); window.location.reload(); }}>
-            ↻ Reset & Return to Home
-          </button>
-        </div>
-      );
-    }
+    if (this.state.error) return <main className="center" style={{ minHeight: '100vh', padding: '2rem', textAlign: 'center' }}><div className="glass-panel" style={{ maxWidth: '560px', padding: '2.5rem' }}><span className="badge badge-warning">Safe recovery</span><h1 style={{ margin: '1rem 0' }}>We couldn’t open this view.</h1><p style={{ color: 'var(--text-dim)', lineHeight: 1.6 }}>Your clinical data has not been changed. Return to the home screen and try again.</p><button className="btn btn-blue btn-lg" style={{ marginTop: '1.5rem' }} onClick={() => { localStorage.removeItem('cs_view'); window.location.reload(); }}>Return to home</button></div></main>;
     return this.props.children;
   }
 }
 
 function getInitialView() {
-  try {
-    const v = localStorage.getItem('cs_view');
-    if (['landing', 'patient', 'doctor', 'analytics', 'demo'].includes(v)) {
-      return v;
-    }
-    localStorage.removeItem('cs_view');
-  } catch (e) {
-    console.error("Failed to parse persisted state", e);
-  }
+  try { const value = localStorage.getItem('cs_view'); if (VIEWS.includes(value)) return value; localStorage.removeItem('cs_view'); } catch { /* Browser storage can be unavailable. */ }
   return 'landing';
 }
 
-function App() {
-  const [view, setView] = useState(getInitialView);
-  const [language, setLanguage] = useState('en');
+const portalCards = [
+  { key: 'patient', icon: '◉', title: 'Patient Kiosk', copy: 'A simple, multilingual guided intake experience.', action: 'Begin patient intake' },
+  { key: 'doctor', icon: '✚', title: 'Doctor Dashboard', copy: 'Review AI-assisted histories with clinical context.', action: 'Open clinical workspace' },
+  { key: 'demo', icon: '◆', title: 'Demo scenarios', copy: 'Load deterministic cases for a reliable presentation.', action: 'Explore demo mode' },
+];
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('cs_view', view);
-    } catch (e) {}
-  }, [view]);
-
-  return (
-    <ErrorBoundary>
-      <div className="app-bg" />
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1 }}>
-        <Navbar view={view} setView={setView} language={language} setLanguage={setLanguage} />
-
-        {view === 'landing' && (
-          <div className="center" style={{ flex: 1, flexDirection: 'column', padding: '3rem 2rem' }}>
-            
-            {/* Hero Section */}
-            <div className="slide-up" style={{ textAlign: 'center', maxWidth: '800px', margin: '0 auto 4rem auto' }}>
-              <div className="badge badge-ai" style={{ marginBottom: '1.5rem', fontSize: '0.85rem', padding: '0.5rem 1rem' }}>
-                <span style={{ marginRight: '0.5rem' }}>✨</span> Transform Raw Speech into Structured Clinical Data
-              </div>
-              <h1 className="display-font" style={{
-                fontSize: '4.5rem', fontWeight: 800, marginBottom: '1rem', lineHeight: 1.1,
-                background: 'linear-gradient(135deg, #ffffff 0%, #94a3b8 100%)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              }}>
-                Listen. Understand. <br/>
-                <span className="text-gradient">Structure.</span>
-              </h1>
-              <p style={{ fontSize: '1.25rem', color: 'var(--text-dim)', fontWeight: 400, marginBottom: '2rem', lineHeight: 1.6 }}>
-                CodeScribe AI is a voice-first clinical case-taking kiosk for Indian OPDs. It captures patient stories in their native language and delivers doctor-ready insights.
-              </p>
-              
-              {/* Feature Tags */}
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '2rem' }}>
-                <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)' }}>🎙️ Multilingual Voice</span>
-                <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)' }}>🤖 Automated Triage</span>
-                <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)' }}>⚖️ Western & Ayush</span>
-                <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)' }}>🔗 ABDM/FHIR Ready</span>
-              </div>
-            </div>
-
-            {/* Application Portals */}
-            <div className="slide-up" style={{ animationDelay: '0.2s', width: '100%', maxWidth: '1200px' }}>
-              <h3 className="display-font" style={{ textAlign: 'center', color: 'var(--text-dim)', marginBottom: '2rem', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                Access Portals
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem' }}>
-                {[
-                  { key: 'patient', icon: '🎙️', label: 'Patient Kiosk', desc: 'Experience the multilingual voice intake flow', color: 'var(--blue)' },
-                  { key: 'doctor', icon: '🩺', label: 'Doctor Dashboard', desc: 'Review AI insights, edit, and approve records', color: 'var(--emerald)' },
-                  { key: 'analytics', icon: '📊', label: 'OPD Analytics', desc: 'Monitor throughput and triage distributions', color: 'var(--amber)' },
-                  { key: 'demo', icon: '🎮', label: 'Demo Control', desc: 'Inject test scenarios and manage state', color: 'var(--purple)' },
-                ].map((card, i) => (
-                  <button key={card.key} className="glass"
-                    onClick={() => setView(card.key)}
-                    style={{
-                      padding: '2.5rem 1.5rem', cursor: 'pointer', textAlign: 'left',
-                      display: 'flex', flexDirection: 'column', gap: '1rem',
-                      position: 'relative', overflow: 'hidden'
-                    }}
-                    onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.borderColor = card.color; }}
-                    onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
-                  >
-                    <div style={{ 
-                      position: 'absolute', top: 0, right: 0, width: '150px', height: '150px', 
-                      background: `radial-gradient(circle at top right, ${card.color}, transparent 70%)`, opacity: 0.1, borderRadius: '0 16px 0 100%' 
-                    }} />
-                    <span style={{ fontSize: '2.5rem', background: 'rgba(0,0,0,0.2)', width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '16px' }}>
-                      {card.icon}
-                    </span>
-                    <div>
-                      <h3 className="display-font" style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text)', marginBottom: '0.5rem' }}>{card.label}</h3>
-                      <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{card.desc}</p>
-                    </div>
-                    <div style={{ marginTop: 'auto', paddingTop: '1rem', color: card.color, fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      Launch Portal <span>→</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div style={{ marginTop: '5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              <p>Smart India Hackathon 2026 · Problem Statement SIH26047 · Team Code Raiders</p>
-              <p style={{ marginTop: '0.5rem', opacity: 0.7 }}>This is a hackathon prototype. Not clinically validated.</p>
-            </div>
-          </div>
-        )}
-
-        {view === 'patient' && (
-          <div style={{ flex: 1, padding: '0 0 2rem 0', display: 'flex', flexDirection: 'column' }}>
-            <PatientFlow language={language} onLogout={() => setView('landing')} />
-          </div>
-        )}
-
-        {view === 'doctor' && (
-          <div style={{ flex: 1, padding: '1.5rem', overflow: 'hidden' }}>
-            <DoctorDashboard language={language} />
-          </div>
-        )}
-
-        {view === 'analytics' && <AnalyticsDashboard language={language} />}
-        {view === 'demo' && <DemoControlCenter />}
+function Landing({ setView }) {
+  return <>
+    <main className="health-hero">
+      <div className="hero-grid">
+        <section className="slide-up">
+          <div className="eyebrow">● Multilingual clinical intake</div>
+          <h1>CodeScribe AI<br /><span>Your Voice. Your Language.</span><br />Your Health Story.</h1>
+          <p className="hero-copy">A multilingual, AI-powered patient case-taking system that helps hospitals capture structured clinical histories faster, more clearly, and with the doctor always in control.</p>
+          <div className="hero-actions"><button className="btn btn-blue btn-lg" onClick={() => setView('patient')}>Start patient kiosk →</button><button className="btn btn-ghost btn-lg" onClick={() => setView('demo')}>View demo scenarios</button></div>
+          <div className="trust-row"><span>✓ English · हिन्दी · ಕನ್ನಡ</span><span>✓ Doctor review required</span><span>✓ FHIR-ready record</span></div>
+        </section>
+        <aside className="hero-workflow slide-up" style={{ animationDelay: '.08s' }}>
+          <div className="workflow-kicker">How CodeScribe works</div>
+          {[['01', 'Patient', 'Chooses language and shares symptoms'], ['02', 'Voice or touch', 'Accessible intake, with typed fallback'], ['03', 'AI structuring', 'Clear history and confidence indicators'], ['04', 'Doctor review', 'Clinician edits, verifies and approves'], ['05', 'Digital record', 'FHIR-shaped clinical bundle']].map(([n, title, copy]) => <div className="workflow-step" key={n}><span className="workflow-icon">{n}</span><div><strong>{title}</strong><small>{copy}</small></div></div>)}
+        </aside>
       </div>
-    </ErrorBoundary>
-  );
+    </main>
+    <section className="portal-section slide-up" style={{ animationDelay: '.14s' }}><div className="section-label">Choose a workspace</div><h2>Purpose-built for the OPD journey.</h2><div className="portal-grid">{portalCards.map(card => <button className="portal-card" key={card.key} onClick={() => setView(card.key)}><span className="portal-icon">{card.icon}</span><h3>{card.title}</h3><p>{card.copy}</p><span>{card.action} →</span></button>)}</div></section>
+  </>;
 }
 
-export default App;
+export default function App() {
+  const [view, setView] = useState(getInitialView);
+  const [language, setLanguage] = useState('en');
+  const [reviewEncounterId, setReviewEncounterId] = useState(null);
+  useEffect(() => { try { localStorage.setItem('cs_view', view); } catch { /* Ignore unavailable storage. */ } }, [view]);
+  return <ErrorBoundary><div className="app-bg" /><div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}><Navbar view={view} setView={setView} language={language} setLanguage={setLanguage} />
+    {view === 'landing' && <Landing setView={setView} />}
+    {view === 'patient' && <div style={{ flex: 1 }}><PatientFlow language={language} onLanguageChange={setLanguage} onLogout={() => setView('landing')} /></div>}
+    {view === 'doctor' && <div style={{ flex: 1, padding: '1.25rem' }}><DoctorDashboard language={language} initialEncounterId={reviewEncounterId} /></div>}
+    {view === 'analytics' && <AnalyticsDashboard />}
+    {view === 'demo' && <DemoControlCenter onOpenCase={(encounterId) => { setReviewEncounterId(encounterId); setView('doctor'); }} />}
+  </div></ErrorBoundary>;
+}
