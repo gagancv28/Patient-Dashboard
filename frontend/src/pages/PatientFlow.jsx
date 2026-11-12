@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { t } from '../i18n';
 import { api } from '../services/api';
 import { SocratesHistory, WordsComparison } from '../components/ClinicalHistory';
@@ -100,93 +100,85 @@ const PatientForm = ({ onSubmit, lang }) => {
 
 const VOICE_WAVEFORM_HEIGHTS = [35, 65, 85, 50, 90, 60, 75, 40, 80, 55, 70, 45, 85, 60, 35];
 const AI_WAVEFORM_HEIGHTS = [40, 75, 55, 90, 65, 80, 50, 70];
+const MEDICAL_KEYWORDS = ['pain', 'fever', 'headache', 'chest', 'pressure', 'knee', 'joint', 'sweating', 'days', 'weeks', 'severe', 'mild'];
+const SPEECH_SUPPORTED = typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
 
 // ─── Step 4: Voice Recording (WOW MOMENT) ─────────────────────────
 const VoiceRecorder = ({ onSubmit, lang, patientName }) => {
   const [recording, setRecording] = useState(false);
   const [text, setText] = useState('');
   const [manualText, setManualText] = useState('');
-  const [recognition, setRecognition] = useState(null);
-  const [detectedKeywords, setDetectedKeywords] = useState([]);
-  const [speechAvailable, setSpeechAvailable] = useState(false);
-  const [speechError, setSpeechError] = useState('');
+  const recognitionRef = useRef(null);
+  const speechAvailable = SPEECH_SUPPORTED;
+  const [speechError, setSpeechError] = useState(() =>
+    SPEECH_SUPPORTED ? '' : 'Voice input is not supported in this browser. You can type your symptoms or use a quick symptom option below.'
+  );
 
-  // Mock keyword detection for visual effect
-  const medicalKeywords = ['pain', 'fever', 'headache', 'chest', 'pressure', 'knee', 'joint', 'sweating', 'days', 'weeks', 'severe', 'mild'];
-  
-  useEffect(() => {
+  const detectedKeywords = useMemo(() => {
     const words = text.toLowerCase().split(/\s+/);
-    const found = words.filter(w => medicalKeywords.some(mk => w.includes(mk)));
-    if (found.length > detectedKeywords.length) {
-      setDetectedKeywords(Array.from(new Set(found)));
-    }
+    return Array.from(new Set(words.filter(w => MEDICAL_KEYWORDS.some(mk => w.includes(mk)))));
   }, [text]);
 
   useEffect(() => {
-    let rec = null;
-    let isActive = true;
-
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      rec = new SR();
-      rec.continuous = true; 
-      rec.interimResults = true;
-      rec.lang = lang === 'hi' ? 'hi-IN' : lang === 'kn' ? 'kn-IN' : 'en-IN';
-      setSpeechAvailable(true);
-      
-      let fullText = '';
-      
-      rec.onstart = () => {
-        if (isActive) setRecording(true);
-      };
-      
-      rec.onresult = (e) => {
-        if (!isActive) return;
-        let interim = '';
-        for (let i = 0; i < e.results.length; i++) {
-          if (e.results[i].isFinal) { fullText += e.results[i][0].transcript + ' '; }
-          else { interim += e.results[i][0].transcript; }
-        }
-        setText(fullText + interim);
-      };
-      
-      rec.onerror = (event) => {
-        if (!isActive) return;
-        setRecording(false);
-        setSpeechError(event.error === 'not-allowed'
-          ? 'Microphone access was not granted. You can type your symptoms or use a quick symptom option below.'
-          : 'Voice input is unavailable right now. You can type your symptoms or use a quick symptom option below.');
-      };
-      rec.onend = () => { if (isActive) setRecording(false); };
-      
-      setRecognition(rec);
-    } else {
-      setSpeechAvailable(false);
-      setSpeechError('Voice input is not supported in this browser. You can type your symptoms or use a quick symptom option below.');
+    if (!SPEECH_SUPPORTED) {
+      recognitionRef.current = null;
+      return undefined;
     }
-    
+
+    let isActive = true;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = lang === 'hi' ? 'hi-IN' : lang === 'kn' ? 'kn-IN' : 'en-IN';
+
+    let fullText = '';
+
+    rec.onstart = () => {
+      if (isActive) setRecording(true);
+    };
+
+    rec.onresult = (e) => {
+      if (!isActive) return;
+      let interim = '';
+      for (let i = 0; i < e.results.length; i++) {
+        if (e.results[i].isFinal) { fullText += e.results[i][0].transcript + ' '; }
+        else { interim += e.results[i][0].transcript; }
+      }
+      setText(fullText + interim);
+    };
+
+    rec.onerror = (event) => {
+      if (!isActive) return;
+      setRecording(false);
+      setSpeechError(event.error === 'not-allowed'
+        ? 'Microphone access was not granted. You can type your symptoms or use a quick symptom option below.'
+        : 'Voice input is unavailable right now. You can type your symptoms or use a quick symptom option below.');
+    };
+    rec.onend = () => { if (isActive) setRecording(false); };
+
+    recognitionRef.current = rec;
+
     return () => {
       isActive = false;
-      if (rec) {
-        try { rec.stop(); } catch {}
-      }
-      setRecording(false);
+      recognitionRef.current = null;
+      try { rec.stop(); } catch {}
     };
   }, [lang]);
 
   const toggle = () => {
-    if (recording) { 
-      recognition?.stop(); 
-      if (text.trim()) onSubmit(text.trim()); 
-    } else { 
-      setText(''); 
-      setDetectedKeywords([]); 
-      if (!recognition) {
+    if (recording) {
+      recognitionRef.current?.stop();
+      setRecording(false);
+      if (text.trim()) onSubmit(text.trim());
+    } else {
+      setText('');
+      if (!recognitionRef.current) {
         setSpeechError('Voice input is unavailable. Type your symptoms or choose a quick symptom option below.');
         return;
       }
       setSpeechError('');
-      try { recognition.start(); } catch {
+      try { recognitionRef.current.start(); } catch {
         setSpeechError('Voice input could not start. Type your symptoms or choose a quick symptom option below.');
       }
     }
@@ -285,13 +277,18 @@ const VoiceRecorder = ({ onSubmit, lang, patientName }) => {
 // ─── Step 5: AI Processing (WOW MOMENT) ───────────────────────────
 const AIProcessingScreen = ({ text, onDone }) => {
   const [stage, setStage] = useState(0);
-  
+  const onDoneRef = useRef(onDone);
+
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  }, [onDone]);
+
   useEffect(() => {
     if (stage < 4) {
       const timer = setTimeout(() => setStage(s => s + 1), 1200);
       return () => clearTimeout(timer);
     } else {
-      const timer = setTimeout(onDone, 1500);
+      const timer = setTimeout(() => onDoneRef.current?.(), 1500);
       return () => clearTimeout(timer);
     }
   }, [stage]);
@@ -587,15 +584,19 @@ const PatientConfirmation = ({ encounter, onNewPatient, lang }) => (
 export default function PatientFlow({ language: initialLang, onLanguageChange, onLogout }) {
   const [step, setStep] = useState(0);
   const [lang, setLang] = useState(initialLang || 'en');
+  const [prevInitialLang, setPrevInitialLang] = useState(initialLang);
   const [patient, setPatient] = useState(null);
   const [transcript, setTranscript] = useState('');
   const [encounter, setEncounter] = useState(null);
   const [error, setError] = useState('');
 
+  if (initialLang !== prevInitialLang) {
+    setPrevInitialLang(initialLang);
+    setLang(initialLang || 'en');
+  }
+
   const currentStep = STEPS[step];
   const goNext = () => setStep(s => Math.min(s + 1, STEPS.length - 1));
-
-  useEffect(() => { setLang(initialLang || 'en'); }, [initialLang]);
 
   const handleLanguage = (code) => { setLang(code); onLanguageChange?.(code); goNext(); };
   const handleConsent = () => goNext();
