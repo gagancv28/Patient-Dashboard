@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { t } from '../i18n';
-import { getCasePriority, languageLabel, SocratesHistory, WordsComparison } from '../components/ClinicalHistory';
+import { SocratesHistory, WordsComparison } from '../components/ClinicalHistory';
+import { getCasePriority, languageLabel } from '../utils/clinicalHistory';
 
 const formatIST = (iso) => {
   try { return new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) + ' IST'; }
