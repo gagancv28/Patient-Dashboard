@@ -45,7 +45,16 @@ App runs at http://localhost:5173
 | Variable | Default | Description |
 |----------|---------|-------------|
 | DEMO_MODE | `true` | Set to `false` to use real AI services |
+| DATABASE_URL | `sqlite:///codescribe.db` | SQLAlchemy database connection URI |
+| CORS_ORIGINS | `*` | Comma-separated allowed frontend origins |
+| PORT | `5000` | Backend server port |
+| FLASK_DEBUG | `false` | Set to `true` only for local development |
+| VITE_API_BASE_URL | `http://localhost:5000/api` | Backend API base URL for Vite frontend |
 | OPENAI_API_KEY | — | Required only when DEMO_MODE=false |
+
+### Deployment
+- **Backend:** Deploy `backend/` with `Procfile` (`gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4`). Health check endpoint: `GET /api/health`.
+- **Frontend:** Deploy `frontend/` (`npm run build`, output `dist/`) with `vercel.json` SPA rewrites and `VITE_API_BASE_URL` pointing to the deployed backend API.
 
 ## Demo Mode
 
