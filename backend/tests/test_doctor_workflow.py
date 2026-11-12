@@ -48,6 +48,14 @@ class DoctorWorkflowTests(unittest.TestCase):
         self.assertEqual(fhir_res.status_code, 200)
         self.assertEqual(fhir_res.get_json()['resourceType'], 'Bundle')
 
+    def test_invalid_triage_level_rejected(self):
+        created = self.client.post('/api/demo/load/scenario_1').get_json()['encounter']
+        res = self.client.patch(f"/api/encounter/{created['id']}", json={
+            'triage_level': 'INVALID',
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.get_json()['error'], 'Invalid triage_level')
+
 
 if __name__ == '__main__':
     unittest.main()

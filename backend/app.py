@@ -24,6 +24,7 @@ CORS(app, resources={r"/api/*": {"origins": cors_origins}})
 # database to be selected for QA and deployment environments.
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///codescribe.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
 db.init_app(app)
 
 with app.app_context():
@@ -201,7 +202,13 @@ def update_encounter(id):
     if not enc:
         return jsonify({"error": "Not found"}), 404
 
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
+    if 'triage_level' in data:
+        triage_val = str(data['triage_level'] or '').strip().upper()
+        if triage_val not in ('LOW', 'MEDIUM', 'HIGH', 'EMERGENCY'):
+            return jsonify({"error": "Invalid triage_level"}), 400
+        data['triage_level'] = triage_val
+
     editable_fields = [
         'chief_complaint', 'hpi', 'symptoms', 'duration', 'severity',
         'associated_symptoms', 'medications', 'allergies', 'past_history',
