@@ -19,7 +19,7 @@ const StepIndicator = ({ current, total }) => {
 };
 
 // ─── Step 1: Language ─────────────────────────────────────────────
-const LanguageSelect = ({ onSelect, lang }) => (
+const LanguageSelect = ({ onSelect }) => (
   <div className="center slide-up" style={{ flexDirection: 'column', gap: '3rem', minHeight: '65vh' }}>
     <div style={{ textAlign: 'center' }}>
       <span className="eyebrow">Choose your language</span>
@@ -165,7 +165,7 @@ const VoiceRecorder = ({ onSubmit, lang, patientName }) => {
     return () => {
       isActive = false;
       if (rec) {
-        try { rec.stop(); } catch(e) {}
+        try { rec.stop(); } catch {}
       }
       setRecording(false);
     };
@@ -183,7 +183,7 @@ const VoiceRecorder = ({ onSubmit, lang, patientName }) => {
         return;
       }
       setSpeechError('');
-      try { recognition.start(); } catch (error) {
+      try { recognition.start(); } catch {
         setSpeechError('Voice input could not start. Type your symptoms or choose a quick symptom option below.');
       }
     }
@@ -280,7 +280,7 @@ const VoiceRecorder = ({ onSubmit, lang, patientName }) => {
 };
 
 // ─── Step 5: AI Processing (WOW MOMENT) ───────────────────────────
-const AIProcessingScreen = ({ text, onDone, lang }) => {
+const AIProcessingScreen = ({ text, onDone }) => {
   const [stage, setStage] = useState(0);
   
   useEffect(() => {
@@ -601,7 +601,7 @@ export default function PatientFlow({ language: initialLang, onLanguageChange, o
       await api.recordConsent({ phone: data.phone_number, scope: 'voice_recording,ai_processing,data_storage', consented: true });
       setPatient(data);
       goNext();
-    } catch (e) {
+    } catch {
       setError('We could not record consent. Please check the connection and try again.');
     }
   };
@@ -619,7 +619,7 @@ export default function PatientFlow({ language: initialLang, onLanguageChange, o
       const updated = await api.updateEncounter(encounter.id, { followup_answer: ans });
       setEncounter(updated);
       goNext();
-    } catch (e) {
+    } catch {
       setError('We could not save your answer. Please try again.');
     }
   };
@@ -629,7 +629,7 @@ export default function PatientFlow({ language: initialLang, onLanguageChange, o
       const updated = await api.updateEncounter(encounter.id, { ocr_data: data });
       setEncounter(updated);
       goNext();
-    } catch (e) {
+    } catch {
       setError('We could not save prescription details. Please try again or skip this step.');
     }
   };
